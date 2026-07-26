@@ -21,6 +21,8 @@ type CalculatorData = {
   openDays: number;
   rent: number;
   labor: number;
+  shareholderCount: number;
+  shareholderSalary: number;
   utilities: number;
   otherFixed: number;
 };
@@ -144,6 +146,8 @@ export default function Home() {
   const [openDays, setOpenDays] = useState(30);
   const [rent, setRent] = useState(8000);
   const [labor, setLabor] = useState(12000);
+  const [shareholderCount, setShareholderCount] = useState(2);
+  const [shareholderSalary, setShareholderSalary] = useState(4000);
   const [utilities, setUtilities] = useState(2500);
   const [otherFixed, setOtherFixed] = useState(1000);
   const [savedScenarios, setSavedScenarios] = useState<
@@ -182,6 +186,8 @@ export default function Home() {
       openDays,
       rent,
       labor,
+      shareholderCount,
+      shareholderSalary,
       utilities,
       otherFixed,
     }),
@@ -204,6 +210,8 @@ export default function Home() {
       openDays,
       rent,
       labor,
+      shareholderCount,
+      shareholderSalary,
       utilities,
       otherFixed,
     ],
@@ -262,6 +270,13 @@ export default function Home() {
       settlement > 0 ? (contribution / settlement) * 100 : 0;
     const monthlyMargin =
       monthlyRevenue > 0 ? (monthlyProfit / monthlyRevenue) * 100 : 0;
+    const safeShareholderCount = Math.max(Math.round(shareholderCount), 1);
+    const shareholderSalaryTotal =
+      safeShareholderCount * shareholderSalary;
+    const profitPerShareholder =
+      monthlyProfit > 0 ? monthlyProfit / safeShareholderCount : 0;
+    const incomePerShareholder =
+      shareholderSalary + profitPerShareholder;
     const foodRate = salePrice > 0 ? (unitCost / salePrice) * 100 : 0;
     const rawWeight = cookedWeight / safeYield;
     const piecesMin = Math.ceil(cookedWeight / 22);
@@ -296,6 +311,10 @@ export default function Home() {
       breakEvenDaily,
       margin,
       monthlyMargin,
+      safeShareholderCount,
+      shareholderSalaryTotal,
+      profitPerShareholder,
+      incomePerShareholder,
       foodRate,
       rawWeight,
       piecesMin,
@@ -319,6 +338,8 @@ export default function Home() {
     riceCost,
     salePrice,
     seasoningCost,
+    shareholderCount,
+    shareholderSalary,
     sideCost,
     utilities,
     yieldRate,
@@ -365,6 +386,8 @@ export default function Home() {
     setOpenDays(data.openDays);
     setRent(data.rent);
     setLabor(data.labor);
+    setShareholderCount(data.shareholderCount ?? 2);
+    setShareholderSalary(data.shareholderSalary ?? 4000);
     setUtilities(data.utilities);
     setOtherFixed(data.otherFixed);
   };
@@ -430,6 +453,9 @@ export default function Home() {
 牛腩成本：${money(calc.monthlyBeefCost)}（占营业额${(calc.monthlyRevenue > 0 ? calc.monthlyBeefCost / calc.monthlyRevenue * 100 : 0).toFixed(1)}%）
 其他单份成本：${money(calc.monthlyOtherUnitCost)}（占营业额${(calc.monthlyRevenue > 0 ? calc.monthlyOtherUnitCost / calc.monthlyRevenue * 100 : 0).toFixed(1)}%）
 每月固定成本：${money(calc.fixed)}
+股东固定工资：${calc.safeShareholderCount}人 × ${money(shareholderSalary)}＝${money(calc.shareholderSalaryTotal)}（已包含在全部人工内）
+保本时每位股东工资：${money(shareholderSalary)}，无经营分红
+当前利润全部平均分配时：每位股东分红${money(calc.profitPerShareholder)}，工资加分红合计${money(calc.incomePerShareholder)}
 每日保本单量：${Number.isFinite(calc.breakEvenDaily) ? `${integer(calc.breakEvenDaily)}单` : "无法保本"}
 预计月利润：${money(calc.monthlyProfit)}
 预计月净利率：${calc.monthlyMargin.toFixed(1)}%
@@ -557,6 +583,22 @@ export default function Home() {
       650,
     );
     text(
+      `保本已含股东工资：${calc.safeShareholderCount}人 × ${money(shareholderSalary)}/月`,
+      112,
+      534,
+      18,
+      "#D9CDBD",
+      550,
+    );
+    text(
+      `当前若利润全部平均分配，每人工资＋分红约 ${money(calc.incomePerShareholder)}/月`,
+      112,
+      560,
+      18,
+      "#D9CDBD",
+      550,
+    );
+    text(
       `每天比保本线多 ${integer(Math.max(dailyOrders - safeBreakEven, 0))} 单`,
       820,
       332,
@@ -666,7 +708,7 @@ export default function Home() {
       `美团综合扣除不超过 ${platformRate}%`,
       `熟制出成率达到 ${yieldRate}%，每份熟牛腩 ${cookedWeight} 克`,
       `每天达到 ${dailyOrders} 单，其中堂食约 ${calc.dineInDailyOrders.toFixed(0)} 单`,
-      `每月固定成本控制在 ${money(calc.fixed)}`,
+      `固定成本含股东工资 ${money(calc.shareholderSalaryTotal)}，每人 ${money(shareholderSalary)}`,
     ];
     conditions.forEach((condition, index) => {
       const y = 1720 + index * 43;
@@ -1238,7 +1280,24 @@ export default function Home() {
             onChange={setLabor}
             unit="元/月"
             step={100}
-            hint="包括你和合伙人的合理工资。"
+            hint="包括股东工资和普通员工工资，下面的股东工资只是对这笔人工费用做拆分，不会重复相加。"
+          />
+          <NumberField
+            label="股东人数"
+            value={shareholderCount}
+            onChange={setShareholderCount}
+            unit="人"
+            min={1}
+            max={10}
+            step={1}
+          />
+          <NumberField
+            label="每位股东月工资"
+            value={shareholderSalary}
+            onChange={setShareholderSalary}
+            unit="元/月"
+            step={100}
+            hint="保本时仍可领取的固定劳动工资，不是利润分红。"
           />
           <NumberField
             label="水电燃气"
@@ -1255,6 +1314,13 @@ export default function Home() {
             step={100}
           />
         </div>
+        {calc.shareholderSalaryTotal > labor && (
+          <p className="notice">
+            当前股东工资合计{money(calc.shareholderSalaryTotal)}
+            ，已经超过“全部人工”{money(labor)}
+            。请提高全部人工预算，否则模型少算了人工成本。
+          </p>
+        )}
       </section>
 
       <section className="section final-result">
@@ -1276,6 +1342,9 @@ export default function Home() {
           <div><span>堂食每单贡献</span><strong>{money(calc.dineInContribution)}</strong></div>
           <div><span>堂食毛利率</span><strong>{(dineInPrice > 0 ? calc.dineInContribution / dineInPrice * 100 : 0).toFixed(1)}%</strong></div>
           <div><span>堂食/外卖日单量</span><strong>{calc.dineInDailyOrders.toFixed(0)} / {calc.deliveryDailyOrders.toFixed(0)}单</strong></div>
+          <div><span>股东固定工资</span><strong>{calc.safeShareholderCount}人 × {money(shareholderSalary)}</strong></div>
+          <div><span>每位股东利润分红</span><strong>{money(calc.profitPerShareholder)}</strong></div>
+          <div><span>每位股东工资＋分红</span><strong>{money(calc.incomePerShareholder)}</strong></div>
           <div><span>每月固定成本</span><strong>{money(calc.fixed)}</strong></div>
           <div><span>每日保本单量</span><strong>{Number.isFinite(calc.breakEvenDaily) ? `${integer(calc.breakEvenDaily)}单` : "无法保本"}</strong></div>
           <div><span>预计月净利率</span><strong>{calc.monthlyMargin.toFixed(1)}%</strong></div>
