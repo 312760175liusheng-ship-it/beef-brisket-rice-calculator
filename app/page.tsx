@@ -208,6 +208,15 @@ export default function Home() {
     const contribution = settlement - unitCost;
     const fixed = rent + labor + utilities + otherFixed;
     const monthlyOrders = dailyOrders * openDays;
+    const monthlyRevenue = salePrice * monthlyOrders;
+    const monthlySettlement = settlement * monthlyOrders;
+    const monthlyPlatformCost = monthlyRevenue - monthlySettlement;
+    const monthlyBeefCost = beefCost * monthlyOrders;
+    const monthlyOtherUnitCost = otherFood * monthlyOrders;
+    const monthlyVariableCost = unitCost * monthlyOrders;
+    const grossProfit = monthlyRevenue - monthlyVariableCost;
+    const grossMargin =
+      monthlyRevenue > 0 ? (grossProfit / monthlyRevenue) * 100 : 0;
     const monthlyProfit = contribution * monthlyOrders - fixed;
     const breakEvenDaily =
       contribution > 0 && openDays > 0
@@ -216,9 +225,7 @@ export default function Home() {
     const margin =
       settlement > 0 ? (contribution / settlement) * 100 : 0;
     const monthlyMargin =
-      settlement * monthlyOrders > 0
-        ? (monthlyProfit / (settlement * monthlyOrders)) * 100
-        : 0;
+      monthlyRevenue > 0 ? (monthlyProfit / monthlyRevenue) * 100 : 0;
     const foodRate = salePrice > 0 ? (unitCost / salePrice) * 100 : 0;
     const rawWeight = cookedWeight / safeYield;
     const piecesMin = Math.ceil(cookedWeight / 22);
@@ -227,10 +234,20 @@ export default function Home() {
     return {
       beefBase,
       beefCost,
+      otherFood,
       unitCost,
       settlement,
       contribution,
       fixed,
+      monthlyOrders,
+      monthlyRevenue,
+      monthlySettlement,
+      monthlyPlatformCost,
+      monthlyBeefCost,
+      monthlyOtherUnitCost,
+      monthlyVariableCost,
+      grossProfit,
+      grossMargin,
       monthlyProfit,
       breakEvenDaily,
       margin,
@@ -351,6 +368,11 @@ export default function Home() {
 【门店参数】
 每日订单：${dailyOrders}单
 每月营业：${openDays}天
+月总营业额：${money(calc.monthlyRevenue)}
+产品毛利率：${calc.grossMargin.toFixed(1)}%
+平台费用：${money(calc.monthlyPlatformCost)}（占营业额${platformRate.toFixed(1)}%）
+牛腩成本：${money(calc.monthlyBeefCost)}（占营业额${(calc.monthlyRevenue > 0 ? calc.monthlyBeefCost / calc.monthlyRevenue * 100 : 0).toFixed(1)}%）
+其他单份成本：${money(calc.monthlyOtherUnitCost)}（占营业额${(calc.monthlyRevenue > 0 ? calc.monthlyOtherUnitCost / calc.monthlyRevenue * 100 : 0).toFixed(1)}%）
 每月固定成本：${money(calc.fixed)}
 每日保本单量：${Number.isFinite(calc.breakEvenDaily) ? `${integer(calc.breakEvenDaily)}单` : "无法保本"}
 预计月利润：${money(calc.monthlyProfit)}
@@ -440,6 +462,16 @@ export default function Home() {
           <p>用于支付房租、人工、水电并产生利润</p>
         </article>
         <article className="result-card">
+          <span>月总营业额</span>
+          <strong>{money(calc.monthlyRevenue)}</strong>
+          <p>顾客实付金额，不扣平台费用</p>
+        </article>
+        <article className="result-card">
+          <span>产品毛利率</span>
+          <strong>{calc.grossMargin.toFixed(1)}%</strong>
+          <p>营业额扣除食材和包装，不扣平台与固定成本</p>
+        </article>
+        <article className="result-card">
           <span>每日保本单量</span>
           <strong>
             {Number.isFinite(calc.breakEvenDaily)
@@ -448,6 +480,107 @@ export default function Home() {
           </strong>
           <p>已把两位合伙人的工资计入人工</p>
         </article>
+      </section>
+
+      <section className="section overview-section">
+        <div className="section-title">
+          <div>
+            <p className="eyebrow">数据总览</p>
+            <h2>月度收入与费用占比</h2>
+          </div>
+          <span>全部比例统一按总营业额计算</span>
+        </div>
+        <div className="overview-grid">
+          <article>
+            <span>月总营业额</span>
+            <strong>{money(calc.monthlyRevenue)}</strong>
+            <p>{integer(calc.monthlyOrders)}单 × {money(salePrice)}</p>
+          </article>
+          <article>
+            <span>平台扣除后到账</span>
+            <strong>{money(calc.monthlySettlement)}</strong>
+            <p>占营业额 {(calc.monthlyRevenue > 0 ? calc.monthlySettlement / calc.monthlyRevenue * 100 : 0).toFixed(1)}%</p>
+          </article>
+          <article>
+            <span>产品毛利润</span>
+            <strong>{money(calc.grossProfit)}</strong>
+            <p>毛利率 {calc.grossMargin.toFixed(1)}%</p>
+          </article>
+          <article>
+            <span>预计月净利润</span>
+            <strong className={calc.monthlyProfit >= 0 ? "positive" : "negative"}>
+              {money(calc.monthlyProfit)}
+            </strong>
+            <p>净利率 {calc.monthlyMargin.toFixed(1)}%</p>
+          </article>
+        </div>
+
+        <div className="cost-share-list">
+          {[
+            {
+              label: "美团及活动综合扣除",
+              amount: calc.monthlyPlatformCost,
+              rate: platformRate,
+              tone: "platform",
+            },
+            {
+              label: "熟牛腩成本",
+              amount: calc.monthlyBeefCost,
+              rate:
+                calc.monthlyRevenue > 0
+                  ? (calc.monthlyBeefCost / calc.monthlyRevenue) * 100
+                  : 0,
+              tone: "beef",
+            },
+            {
+              label: "米饭、配菜、调味及包装",
+              amount: calc.monthlyOtherUnitCost,
+              rate:
+                calc.monthlyRevenue > 0
+                  ? (calc.monthlyOtherUnitCost / calc.monthlyRevenue) * 100
+                  : 0,
+              tone: "other",
+            },
+            {
+              label: "房租、人工、水电等固定成本",
+              amount: calc.fixed,
+              rate:
+                calc.monthlyRevenue > 0
+                  ? (calc.fixed / calc.monthlyRevenue) * 100
+                  : 0,
+              tone: "fixed",
+            },
+            {
+              label: "最终净利润",
+              amount: calc.monthlyProfit,
+              rate:
+                calc.monthlyRevenue > 0
+                  ? (calc.monthlyProfit / calc.monthlyRevenue) * 100
+                  : 0,
+              tone: calc.monthlyProfit >= 0 ? "profit" : "loss",
+            },
+          ].map((item) => (
+            <article key={item.label}>
+              <div className="cost-share-head">
+                <span>{item.label}</span>
+                <strong>
+                  {money(item.amount)} · {item.rate.toFixed(1)}%
+                </strong>
+              </div>
+              <div className="share-track" aria-hidden="true">
+                <span
+                  className={item.tone}
+                  style={{
+                    width: `${Math.min(Math.max(Math.abs(item.rate), 0), 100)}%`,
+                  }}
+                />
+              </div>
+            </article>
+          ))}
+        </div>
+        <p className="notice">
+          产品毛利率只扣食材和包装，适合判断产品本身；最终净利率还扣除了平台费用、房租、人工、水电等支出，适合判断整店经营结果。
+        </p>
       </section>
 
       <section className="section scenario-section">
@@ -750,6 +883,8 @@ export default function Home() {
           <div><span>每单到账</span><strong>{money(calc.settlement)}</strong></div>
           <div><span>牛腩成本</span><strong>{money(calc.beefCost)}</strong></div>
           <div><span>每份总变动成本</span><strong>{money(calc.unitCost)}</strong></div>
+          <div><span>月总营业额</span><strong>{money(calc.monthlyRevenue)}</strong></div>
+          <div><span>产品毛利率</span><strong>{calc.grossMargin.toFixed(1)}%</strong></div>
           <div><span>每单贡献利润</span><strong>{money(calc.contribution)}</strong></div>
           <div><span>贡献利润率</span><strong>{calc.margin.toFixed(1)}%</strong></div>
           <div><span>每月固定成本</span><strong>{money(calc.fixed)}</strong></div>

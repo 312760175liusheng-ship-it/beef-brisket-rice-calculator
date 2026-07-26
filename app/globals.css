@@ -243,6 +243,94 @@ h1 {
   gap: 14px;
 }
 
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.overview-grid article {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.overview-grid span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.overview-grid strong {
+  display: block;
+  margin: 10px 0 8px;
+  font-size: 25px;
+  letter-spacing: -0.035em;
+}
+
+.overview-grid p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cost-share-list {
+  display: grid;
+  gap: 17px;
+  margin-top: 28px;
+}
+
+.cost-share-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.cost-share-head span {
+  color: var(--muted);
+}
+
+.share-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #ece7df;
+  overflow: hidden;
+}
+
+.share-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #9b9286;
+}
+
+.share-track .platform {
+  background: #b7792d;
+}
+
+.share-track .beef {
+  background: var(--brand);
+}
+
+.share-track .other {
+  background: #8a7661;
+}
+
+.share-track .fixed {
+  background: #57514b;
+}
+
+.share-track .profit {
+  background: var(--green);
+}
+
+.share-track .loss {
+  background: #c4594e;
+}
+
 .scenario-grid article {
   min-height: 184px;
   padding: 22px;
@@ -621,7 +709,8 @@ footer {
   .three-column,
   .cost-grid,
   .cost-grid.fixed,
-  .scenario-grid {
+  .scenario-grid,
+  .overview-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -714,8 +803,17 @@ footer {
   .cost-grid.fixed,
   .portion-grid,
   .scenario-grid,
-  .formula-grid {
+  .formula-grid,
+  .overview-grid {
     grid-template-columns: 1fr;
+  }
+
+  .cost-share-head {
+    align-items: flex-end;
+  }
+
+  .cost-share-head strong {
+    text-align: right;
   }
 
   .field-head {
