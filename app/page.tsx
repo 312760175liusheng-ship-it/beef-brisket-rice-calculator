@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 type CalculatorData = {
   salePrice: number;
   platformRate: number;
+  dineInPrice: number;
+  dineInShare: number;
+  dineInConsumables: number;
   beefPrice: number;
   yieldRate: number;
   cookedWeight: number;
@@ -123,6 +126,9 @@ const integer = (value: number) =>
 export default function Home() {
   const [salePrice, setSalePrice] = useState(25);
   const [platformRate, setPlatformRate] = useState(25);
+  const [dineInPrice, setDineInPrice] = useState(20);
+  const [dineInShare, setDineInShare] = useState(10);
+  const [dineInConsumables, setDineInConsumables] = useState(0.3);
   const [beefPrice, setBeefPrice] = useState(29);
   const [yieldRate, setYieldRate] = useState(70);
   const [cookedWeight, setCookedWeight] = useState(80);
@@ -160,6 +166,9 @@ export default function Home() {
     () => ({
       salePrice,
       platformRate,
+      dineInPrice,
+      dineInShare,
+      dineInConsumables,
       beefPrice,
       yieldRate,
       cookedWeight,
@@ -179,6 +188,9 @@ export default function Home() {
     [
       salePrice,
       platformRate,
+      dineInPrice,
+      dineInShare,
+      dineInConsumables,
       beefPrice,
       yieldRate,
       cookedWeight,
@@ -206,21 +218,45 @@ export default function Home() {
     const unitCost = beefCost + otherFood;
     const settlement = salePrice * (1 - platformRate / 100);
     const contribution = settlement - unitCost;
+    const dineInOtherFood =
+      riceCost +
+      sideCost +
+      seasoningCost +
+      dineInConsumables +
+      otherUnitCost;
+    const dineInUnitCost = beefCost + dineInOtherFood;
+    const dineInContribution = dineInPrice - dineInUnitCost;
     const fixed = rent + labor + utilities + otherFixed;
+    const safeDineInShare = Math.min(Math.max(dineInShare, 0), 100) / 100;
+    const dineInDailyOrders = dailyOrders * safeDineInShare;
+    const deliveryDailyOrders = dailyOrders - dineInDailyOrders;
     const monthlyOrders = dailyOrders * openDays;
-    const monthlyRevenue = salePrice * monthlyOrders;
-    const monthlySettlement = settlement * monthlyOrders;
+    const monthlyDineInOrders = dineInDailyOrders * openDays;
+    const monthlyDeliveryOrders = deliveryDailyOrders * openDays;
+    const monthlyRevenue =
+      salePrice * monthlyDeliveryOrders + dineInPrice * monthlyDineInOrders;
+    const monthlySettlement =
+      settlement * monthlyDeliveryOrders + dineInPrice * monthlyDineInOrders;
     const monthlyPlatformCost = monthlyRevenue - monthlySettlement;
     const monthlyBeefCost = beefCost * monthlyOrders;
-    const monthlyOtherUnitCost = otherFood * monthlyOrders;
-    const monthlyVariableCost = unitCost * monthlyOrders;
+    const monthlyOtherUnitCost =
+      otherFood * monthlyDeliveryOrders +
+      dineInOtherFood * monthlyDineInOrders;
+    const monthlyVariableCost =
+      unitCost * monthlyDeliveryOrders +
+      dineInUnitCost * monthlyDineInOrders;
     const grossProfit = monthlyRevenue - monthlyVariableCost;
     const grossMargin =
       monthlyRevenue > 0 ? (grossProfit / monthlyRevenue) * 100 : 0;
-    const monthlyProfit = contribution * monthlyOrders - fixed;
+    const monthlyContribution =
+      contribution * monthlyDeliveryOrders +
+      dineInContribution * monthlyDineInOrders;
+    const weightedContribution =
+      monthlyOrders > 0 ? monthlyContribution / monthlyOrders : 0;
+    const monthlyProfit = monthlyContribution - fixed;
     const breakEvenDaily =
-      contribution > 0 && openDays > 0
-        ? Math.ceil(fixed / contribution / openDays)
+      weightedContribution > 0 && openDays > 0
+        ? Math.ceil(fixed / weightedContribution / openDays)
         : Infinity;
     const margin =
       settlement > 0 ? (contribution / settlement) * 100 : 0;
@@ -238,6 +274,14 @@ export default function Home() {
       unitCost,
       settlement,
       contribution,
+      dineInOtherFood,
+      dineInUnitCost,
+      dineInContribution,
+      dineInDailyOrders,
+      deliveryDailyOrders,
+      monthlyDineInOrders,
+      monthlyDeliveryOrders,
+      weightedContribution,
       fixed,
       monthlyOrders,
       monthlyRevenue,
@@ -261,6 +305,9 @@ export default function Home() {
     beefPrice,
     cookedWeight,
     dailyOrders,
+    dineInConsumables,
+    dineInPrice,
+    dineInShare,
     labor,
     openDays,
     operationLoss,
@@ -278,7 +325,7 @@ export default function Home() {
   ]);
 
   const status =
-    calc.monthlyProfit > 0 && calc.margin >= 35
+    calc.monthlyProfit > 0 && calc.monthlyMargin >= 8
       ? { label: "当前模型较健康", tone: "good" }
       : calc.contribution > 0 && calc.monthlyProfit > -3000
         ? { label: "利润偏紧，需要实测", tone: "warn" }
@@ -302,6 +349,9 @@ export default function Home() {
   const applyData = (data: CalculatorData) => {
     setSalePrice(data.salePrice);
     setPlatformRate(data.platformRate);
+    setDineInPrice(data.dineInPrice ?? 20);
+    setDineInShare(data.dineInShare ?? 10);
+    setDineInConsumables(data.dineInConsumables ?? 0.3);
     setBeefPrice(data.beefPrice);
     setYieldRate(data.yieldRate);
     setCookedWeight(data.cookedWeight);
@@ -354,9 +404,13 @@ export default function Home() {
 生成时间：${new Date().toLocaleString("zh-CN")}
 
 【核心参数】
-顾客实付：${money(salePrice)}
+外卖顾客实付：${money(salePrice)}
 美团综合扣除：${platformRate}%
 商家每单到账：${money(calc.settlement)}
+外卖平台后毛利率：${calc.margin.toFixed(1)}%
+堂食价格：${money(dineInPrice)}
+堂食每份变动成本：${money(calc.dineInUnitCost)}
+堂食毛利率：${(dineInPrice > 0 ? calc.dineInContribution / dineInPrice * 100 : 0).toFixed(1)}%
 生牛腩采购价：${beefPrice}元/斤
 熟制出成率：${yieldRate}%
 熟牛腩净重：${cookedWeight}克
@@ -366,11 +420,13 @@ export default function Home() {
 每单贡献利润：${money(calc.contribution)}
 
 【门店参数】
-每日订单：${dailyOrders}单
+每日总订单：${dailyOrders}单
+堂食占比：${dineInShare}%（约${calc.dineInDailyOrders.toFixed(1)}单/天）
+外卖占比：${(100 - dineInShare).toFixed(0)}%（约${calc.deliveryDailyOrders.toFixed(1)}单/天）
 每月营业：${openDays}天
 月总营业额：${money(calc.monthlyRevenue)}
 产品毛利率：${calc.grossMargin.toFixed(1)}%
-平台费用：${money(calc.monthlyPlatformCost)}（占营业额${platformRate.toFixed(1)}%）
+平台费用：${money(calc.monthlyPlatformCost)}（占营业额${(calc.monthlyRevenue > 0 ? calc.monthlyPlatformCost / calc.monthlyRevenue * 100 : 0).toFixed(1)}%）
 牛腩成本：${money(calc.monthlyBeefCost)}（占营业额${(calc.monthlyRevenue > 0 ? calc.monthlyBeefCost / calc.monthlyRevenue * 100 : 0).toFixed(1)}%）
 其他单份成本：${money(calc.monthlyOtherUnitCost)}（占营业额${(calc.monthlyRevenue > 0 ? calc.monthlyOtherUnitCost / calc.monthlyRevenue * 100 : 0).toFixed(1)}%）
 每月固定成本：${money(calc.fixed)}
@@ -379,33 +435,293 @@ export default function Home() {
 预计月净利率：${calc.monthlyMargin.toFixed(1)}%
 
 【完整公式】
-月利润 = [售价 × (1−平台扣除率) − 牛腩成本 − 其他单份成本] × 日单量 × 营业天数 − 月固定成本
+混合月利润 =（外卖每单贡献 × 外卖单量＋堂食每单贡献 × 堂食单量）× 营业天数－月固定成本
+外卖每单贡献 = 外卖售价 × (1−平台扣除率) − 外卖每份变动成本
+堂食每单贡献 = 堂食售价 − 堂食每份变动成本
 牛腩成本 = (采购价 ÷ 500) × (熟牛腩克重 ÷ 出成率) × (1＋操作损耗率)
 
 说明：熟牛腩均指沥掉明显汤汁后的熟肉净重。`;
 
-  const exportReport = async () => {
+  const copyTextReport = async () => {
     setExportFeedback("");
     try {
-      if (navigator.share) {
+      await navigator.clipboard.writeText(reportText);
+      setExportFeedback("文字报告已复制，可直接粘贴给AI");
+    } catch {
+      setExportFeedback("复制失败，请稍后重试");
+    }
+  };
+
+  const exportImageReport = async () => {
+    setExportFeedback("正在生成经营测算图片…");
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 1080;
+    canvas.height = 1920;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      setExportFeedback("图片生成失败，请稍后重试");
+      return;
+    }
+
+    const colors = {
+      bg: "#F3EEE6",
+      card: "#FFFFFF",
+      ink: "#181713",
+      muted: "#746F66",
+      line: "#DED8CE",
+      brand: "#9A332C",
+      green: "#297A68",
+      amber: "#B6781E",
+      dark: "#25221E",
+    };
+
+    const roundRect = (
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      radius: number,
+      fill: string,
+    ) => {
+      ctx.beginPath();
+      ctx.roundRect(x, y, width, height, radius);
+      ctx.fillStyle = fill;
+      ctx.fill();
+    };
+
+    const text = (
+      value: string,
+      x: number,
+      y: number,
+      size: number,
+      color = colors.ink,
+      weight = 500,
+      align: CanvasTextAlign = "left",
+    ) => {
+      ctx.fillStyle = color;
+      ctx.font = `${weight} ${size}px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif`;
+      ctx.textAlign = align;
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(value, x, y);
+    };
+
+    const profitAtOrders = (orders: number) =>
+      calc.weightedContribution * orders * openDays - calc.fixed;
+
+    const safeBreakEven = Number.isFinite(calc.breakEvenDaily)
+      ? calc.breakEvenDaily
+      : 0;
+    const targetOrders = Math.max(dailyOrders + 20, safeBreakEven + 20);
+    const beefRate =
+      calc.monthlyRevenue > 0
+        ? (calc.monthlyBeefCost / calc.monthlyRevenue) * 100
+        : 0;
+    const otherRate =
+      calc.monthlyRevenue > 0
+        ? (calc.monthlyOtherUnitCost / calc.monthlyRevenue) * 100
+        : 0;
+    const fixedRate =
+      calc.monthlyRevenue > 0 ? (calc.fixed / calc.monthlyRevenue) * 100 : 0;
+
+    ctx.fillStyle = colors.bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    text("牛腩饭盈利测算", 72, 104, 30, colors.brand, 800);
+    text("这套模型怎么保本、怎么赚钱", 72, 174, 54, colors.ink, 900);
+    text(
+      `熟牛腩${cookedWeight}克 · 外卖${salePrice}元 · 堂食${dineInPrice}元 · 堂食占${dineInShare}%`,
+      72,
+      222,
+      24,
+      colors.muted,
+      500,
+    );
+
+    roundRect(72, 270, 936, 300, 30, colors.dark);
+    text("预计每月净利润", 112, 332, 25, "#D9CDBD", 600);
+    text(
+      money(calc.monthlyProfit),
+      112,
+      440,
+      76,
+      calc.monthlyProfit >= 0 ? "#74C4AE" : "#ED8A7E",
+      900,
+    );
+    text(
+      `月营业额 ${money(calc.monthlyRevenue)}  ·  净利率 ${calc.monthlyMargin.toFixed(1)}%`,
+      112,
+      502,
+      27,
+      "#FFFFFF",
+      650,
+    );
+    text(
+      `每天比保本线多 ${integer(Math.max(dailyOrders - safeBreakEven, 0))} 单`,
+      820,
+      332,
+      22,
+      "#D9CDBD",
+      600,
+      "right",
+    );
+
+    const metrics = [
+      ["每天保本", `${integer(safeBreakEven)}单`],
+      ["混合每单平均贡献", money(calc.weightedContribution)],
+      ["外卖平台后毛利率", `${calc.margin.toFixed(1)}%`],
+    ];
+    metrics.forEach((item, index) => {
+      const x = 72 + index * 316;
+      roundRect(x, 610, 296, 164, 22, colors.card);
+      text(item[0], x + 26, 660, 21, colors.muted, 600);
+      text(item[1], x + 26, 732, 39, colors.ink, 850);
+    });
+
+    text("做到多少单，能赚多少钱", 72, 850, 36, colors.ink, 850);
+    const orderScenarios = [
+      {
+        label: "保本线",
+        orders: safeBreakEven,
+        profit: profitAtOrders(safeBreakEven),
+      },
+      {
+        label: "当前目标",
+        orders: dailyOrders,
+        profit: calc.monthlyProfit,
+      },
+      {
+        label: "增长目标",
+        orders: targetOrders,
+        profit: profitAtOrders(targetOrders),
+      },
+    ];
+    orderScenarios.forEach((scenario, index) => {
+      const y = 890 + index * 106;
+      roundRect(
+        72,
+        y,
+        936,
+        86,
+        18,
+        index === 1 ? "#FFF7F4" : colors.card,
+      );
+      text(scenario.label, 102, y + 54, 22, colors.brand, 750);
+      text(
+        `${integer(scenario.orders)}单/天`,
+        340,
+        y + 54,
+        27,
+        colors.ink,
+        800,
+      );
+      text(
+        scenario.profit > 0
+          ? `月赚约 ${money(scenario.profit)}`
+          : scenario.profit < -1
+            ? `月亏约 ${money(Math.abs(scenario.profit))}`
+            : "基本保本",
+        970,
+        y + 54,
+        27,
+        scenario.profit >= 0 ? colors.green : colors.brand,
+        850,
+        "right",
+      );
+    });
+
+    text("两种渠道每份能留下多少", 72, 1255, 36, colors.ink, 850);
+    const unitRows = [
+      ["外卖：顾客实付", money(salePrice), `到账${money(calc.settlement)}`],
+      ["外卖：平台后贡献", money(calc.contribution), `到账口径${calc.margin.toFixed(1)}%`],
+      ["堂食：顾客实付", money(dineInPrice), "无平台扣除"],
+      ["堂食：每份贡献", money(calc.dineInContribution), `毛利率${(dineInPrice > 0 ? calc.dineInContribution / dineInPrice * 100 : 0).toFixed(1)}%`],
+    ];
+    roundRect(72, 1290, 936, 310, 24, colors.card);
+    unitRows.forEach((row, index) => {
+      const y = 1350 + index * 66;
+      text(row[0], 106, y, 22, colors.muted, 600);
+      text(
+        row[1],
+        800,
+        y,
+        25,
+        index === 3 ? colors.green : colors.ink,
+        800,
+        "right",
+      );
+      text(row[2], 970, y, 21, colors.muted, 650, "right");
+      if (index < unitRows.length - 1) {
+        ctx.strokeStyle = colors.line;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(106, y + 23);
+        ctx.lineTo(970, y + 23);
+        ctx.stroke();
+      }
+    });
+
+    text("这套利润成立的关键条件", 72, 1668, 32, colors.ink, 850);
+    const conditions = [
+      `美团综合扣除不超过 ${platformRate}%`,
+      `熟制出成率达到 ${yieldRate}%，每份熟牛腩 ${cookedWeight} 克`,
+      `每天达到 ${dailyOrders} 单，其中堂食约 ${calc.dineInDailyOrders.toFixed(0)} 单`,
+      `每月固定成本控制在 ${money(calc.fixed)}`,
+    ];
+    conditions.forEach((condition, index) => {
+      const y = 1720 + index * 43;
+      ctx.fillStyle = index === 0 ? colors.amber : colors.brand;
+      ctx.beginPath();
+      ctx.arc(82, y - 7, 5, 0, Math.PI * 2);
+      ctx.fill();
+      text(condition, 104, y, 21, colors.muted, 550);
+    });
+
+    text(
+      `成本占营业额：平台${(calc.monthlyRevenue > 0 ? calc.monthlyPlatformCost / calc.monthlyRevenue * 100 : 0).toFixed(1)}% · 牛腩${beefRate.toFixed(1)}% · 其他单份${otherRate.toFixed(1)}% · 固定成本${fixedRate.toFixed(1)}%`,
+      72,
+      1882,
+      18,
+      colors.muted,
+      500,
+    );
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png", 1),
+    );
+    if (!blob) {
+      setExportFeedback("图片生成失败，请稍后重试");
+      return;
+    }
+
+    const file = new File([blob], "牛腩饭盈利测算.png", {
+      type: "image/png",
+    });
+
+    try {
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({
           title: "牛腩饭盈利测算",
-          text: reportText,
+          text: "这套牛腩饭模型怎么保本、怎么赚钱",
+          files: [file],
         });
-        setExportFeedback("已打开分享");
-      } else {
-        await navigator.clipboard.writeText(reportText);
-        setExportFeedback("报告已复制，可直接粘贴给朋友或AI");
+        setExportFeedback("已打开图片分享");
+        return;
       }
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      try {
-        await navigator.clipboard.writeText(reportText);
-        setExportFeedback("报告已复制，可直接粘贴给朋友或AI");
-      } catch {
-        setExportFeedback("导出失败，请稍后重试");
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setExportFeedback("");
+        return;
       }
     }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "牛腩饭盈利测算.png";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setExportFeedback("测算图片已下载，可直接发送");
   };
 
   return (
@@ -423,9 +739,14 @@ export default function Home() {
           <strong>数据操作</strong>
           <span>分享当前结果，或保存三组方案反复比较</span>
         </div>
-        <button className="export-button" onClick={exportReport}>
-          一键导出当前数据
-        </button>
+        <div className="toolbar-actions">
+          <button className="export-button" onClick={exportImageReport}>
+            导出经营测算图片
+          </button>
+          <button className="copy-button" onClick={copyTextReport}>
+            复制文字给AI
+          </button>
+        </div>
         {exportFeedback && (
           <span className="export-feedback" role="status">
             {exportFeedback}
@@ -441,25 +762,33 @@ export default function Home() {
           </strong>
           <div className={`status ${status.tone}`}>{status.label}</div>
           <p>
-            按每日 {integer(dailyOrders)} 单、每月营业 {openDays} 天计算
+            按每日 {integer(dailyOrders)} 单，其中堂食约{" "}
+            {integer(calc.dineInDailyOrders)} 单
           </p>
         </article>
         <article className="result-card">
-          <span>每单实际到手</span>
+          <span>外卖每单实际到手</span>
           <strong>{money(calc.settlement)}</strong>
           <p>售价扣除美团综合扣除比例</p>
         </article>
         <article className="result-card">
-          <span>每份变动成本</span>
+          <span>外卖每份变动成本</span>
           <strong>{money(calc.unitCost)}</strong>
           <p>熟牛腩、米饭、配菜、调味及包装</p>
         </article>
         <article className="result-card">
-          <span>每单贡献利润</span>
+          <span>外卖每单贡献利润</span>
           <strong className={calc.contribution >= 0 ? "positive" : "negative"}>
             {money(calc.contribution)}
           </strong>
           <p>用于支付房租、人工、水电并产生利润</p>
+        </article>
+        <article className="result-card">
+          <span>堂食每单贡献利润</span>
+          <strong className={calc.dineInContribution >= 0 ? "positive" : "negative"}>
+            {money(calc.dineInContribution)}
+          </strong>
+          <p>堂食售价扣除堂食单份变动成本</p>
         </article>
         <article className="result-card">
           <span>月总营业额</span>
@@ -467,9 +796,15 @@ export default function Home() {
           <p>顾客实付金额，不扣平台费用</p>
         </article>
         <article className="result-card">
-          <span>产品毛利率</span>
-          <strong>{calc.grossMargin.toFixed(1)}%</strong>
-          <p>营业额扣除食材和包装，不扣平台与固定成本</p>
+          <span>堂食毛利率</span>
+          <strong>
+            {(dineInPrice > 0
+              ? (calc.dineInContribution / dineInPrice) * 100
+              : 0
+            ).toFixed(1)}
+            %
+          </strong>
+          <p>堂食售价扣除食材及堂食耗材</p>
         </article>
         <article className="result-card">
           <span>每日保本单量</span>
@@ -494,7 +829,10 @@ export default function Home() {
           <article>
             <span>月总营业额</span>
             <strong>{money(calc.monthlyRevenue)}</strong>
-            <p>{integer(calc.monthlyOrders)}单 × {money(salePrice)}</p>
+            <p>
+              外卖{integer(calc.monthlyDeliveryOrders)}单＋堂食
+              {integer(calc.monthlyDineInOrders)}单
+            </p>
           </article>
           <article>
             <span>平台扣除后到账</span>
@@ -520,7 +858,10 @@ export default function Home() {
             {
               label: "美团及活动综合扣除",
               amount: calc.monthlyPlatformCost,
-              rate: platformRate,
+              rate:
+                calc.monthlyRevenue > 0
+                  ? (calc.monthlyPlatformCost / calc.monthlyRevenue) * 100
+                  : 0,
               tone: "platform",
             },
             {
@@ -600,8 +941,8 @@ export default function Home() {
                 {saved ? (
                   <>
                     <strong>
-                      {saved.data.salePrice}元 · 熟肉
-                      {saved.data.cookedWeight}克
+                      外卖{saved.data.salePrice}元 · 堂食
+                      {saved.data.dineInPrice ?? 20}元
                     </strong>
                     <p>
                       保存于
@@ -651,7 +992,7 @@ export default function Home() {
         </div>
         <div className="two-column">
           <NumberField
-            label="顾客实际支付"
+            label="外卖顾客实际支付"
             value={salePrice}
             onChange={setSalePrice}
             unit="元"
@@ -667,6 +1008,50 @@ export default function Home() {
             max={40}
             hint="把平台扣点、商家承担活动、推广等合并成一个比例。拿到真实账单后，按实际比例调整。"
           />
+        </div>
+        <div className="channel-controls">
+          <NumberField
+            label="堂食售价"
+            value={dineInPrice}
+            onChange={setDineInPrice}
+            unit="元"
+            step={0.5}
+            max={100}
+            hint="默认20元，可根据实际菜单价格调整。"
+          />
+          <RangeField
+            label="堂食订单占比"
+            value={dineInShare}
+            onChange={setDineInShare}
+            unit="%"
+            min={0}
+            max={60}
+            step={5}
+            hint={`按当前每日${dailyOrders}单计算：堂食约${calc.dineInDailyOrders.toFixed(0)}单，外卖约${calc.deliveryDailyOrders.toFixed(0)}单。`}
+          />
+          <NumberField
+            label="堂食餐具及清洁耗材"
+            value={dineInConsumables}
+            onChange={setDineInConsumables}
+            unit="元/份"
+            step={0.1}
+            max={10}
+            hint="堂食不计外卖餐盒，另计纸巾、餐具清洗等耗材。"
+          />
+        </div>
+        <div className="channel-summary">
+          <div>
+            <span>堂食约</span>
+            <strong>{calc.dineInDailyOrders.toFixed(0)}单/天</strong>
+          </div>
+          <div>
+            <span>外卖约</span>
+            <strong>{calc.deliveryDailyOrders.toFixed(0)}单/天</strong>
+          </div>
+          <div>
+            <span>混合每单平均贡献</span>
+            <strong>{money(calc.weightedContribution)}</strong>
+          </div>
         </div>
       </section>
 
@@ -823,7 +1208,7 @@ export default function Home() {
         </div>
         <div className="two-column">
           <NumberField
-            label="每日订单量"
+            label="每日总订单量"
             value={dailyOrders}
             onChange={setDailyOrders}
             unit="单"
@@ -880,13 +1265,17 @@ export default function Home() {
           </div>
         </div>
         <div className="ledger">
-          <div><span>每单到账</span><strong>{money(calc.settlement)}</strong></div>
+          <div><span>外卖每单到账</span><strong>{money(calc.settlement)}</strong></div>
           <div><span>牛腩成本</span><strong>{money(calc.beefCost)}</strong></div>
-          <div><span>每份总变动成本</span><strong>{money(calc.unitCost)}</strong></div>
+          <div><span>外卖每份变动成本</span><strong>{money(calc.unitCost)}</strong></div>
+          <div><span>堂食每份变动成本</span><strong>{money(calc.dineInUnitCost)}</strong></div>
           <div><span>月总营业额</span><strong>{money(calc.monthlyRevenue)}</strong></div>
           <div><span>产品毛利率</span><strong>{calc.grossMargin.toFixed(1)}%</strong></div>
-          <div><span>每单贡献利润</span><strong>{money(calc.contribution)}</strong></div>
-          <div><span>贡献利润率</span><strong>{calc.margin.toFixed(1)}%</strong></div>
+          <div><span>外卖每单贡献</span><strong>{money(calc.contribution)}</strong></div>
+          <div><span>外卖平台后毛利率</span><strong>{calc.margin.toFixed(1)}%</strong></div>
+          <div><span>堂食每单贡献</span><strong>{money(calc.dineInContribution)}</strong></div>
+          <div><span>堂食毛利率</span><strong>{(dineInPrice > 0 ? calc.dineInContribution / dineInPrice * 100 : 0).toFixed(1)}%</strong></div>
+          <div><span>堂食/外卖日单量</span><strong>{calc.dineInDailyOrders.toFixed(0)} / {calc.deliveryDailyOrders.toFixed(0)}单</strong></div>
           <div><span>每月固定成本</span><strong>{money(calc.fixed)}</strong></div>
           <div><span>每日保本单量</span><strong>{Number.isFinite(calc.breakEvenDaily) ? `${integer(calc.breakEvenDaily)}单` : "无法保本"}</strong></div>
           <div><span>预计月净利率</span><strong>{calc.monthlyMargin.toFixed(1)}%</strong></div>
@@ -905,15 +1294,15 @@ export default function Home() {
           <span>所有结果都由这组公式得出</span>
         </div>
         <div className="main-formula">
-          <span>月利润</span>
+          <span>混合渠道月利润</span>
           <strong>
-            ＝〔售价 ×（1－平台扣除率）－ 牛腩成本 －
-            其他单份成本〕× 日单量 × 营业天数 － 月固定成本
+            ＝（外卖每单贡献 × 外卖日单量＋堂食每单贡献 ×
+            堂食日单量）× 营业天数－月固定成本
           </strong>
         </div>
         <div className="formula-grid">
           <article>
-            <span>每单实际到手</span>
+            <span>外卖每单实际到手</span>
             <strong>售价 ×（1－平台扣除率）</strong>
             <p>
               {money(salePrice)} ×（1－{platformRate}%）＝
@@ -930,7 +1319,7 @@ export default function Home() {
             </p>
           </article>
           <article>
-            <span>每单贡献利润</span>
+            <span>外卖每单贡献利润</span>
             <strong>每单实际到手－每份总变动成本</strong>
             <p>
               {money(calc.settlement)}－{money(calc.unitCost)}＝
@@ -938,8 +1327,16 @@ export default function Home() {
             </p>
           </article>
           <article>
+            <span>堂食每单贡献利润</span>
+            <strong>堂食售价－堂食每份变动成本</strong>
+            <p>
+              {money(dineInPrice)}－{money(calc.dineInUnitCost)}＝
+              {money(calc.dineInContribution)}
+            </p>
+          </article>
+          <article>
             <span>每日保本单量</span>
-            <strong>月固定成本 ÷ 每单贡献利润 ÷ 营业天数</strong>
+            <strong>月固定成本 ÷ 混合每单平均贡献 ÷ 营业天数</strong>
             <p>
               当前需要：
               {Number.isFinite(calc.breakEvenDaily)
@@ -949,7 +1346,7 @@ export default function Home() {
           </article>
         </div>
         <p className="notice">
-          “其他单份成本”包括米饭、配菜、酱汁调味、餐盒包装和其他单份支出；“月固定成本”包括房租、全部人工、水电燃气和其他固定支出。
+          外卖计入餐盒包装；堂食不计外卖餐盒，改计堂食餐具及清洁耗材。“月固定成本”包括房租、全部人工、水电燃气和其他固定支出。
         </p>
       </section>
 
