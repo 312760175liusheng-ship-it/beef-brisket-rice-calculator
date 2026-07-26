@@ -77,6 +77,66 @@ h1 {
   color: var(--ink);
 }
 
+.toolbar {
+  position: sticky;
+  z-index: 10;
+  top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(205, 197, 184, 0.85);
+  border-radius: 16px;
+  background: rgba(255, 253, 249, 0.92);
+  box-shadow: 0 10px 30px rgba(53, 42, 26, 0.09);
+  backdrop-filter: blur(14px);
+}
+
+.toolbar > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-right: auto;
+}
+
+.toolbar > div span,
+.export-feedback {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.export-button,
+.save-button,
+.scenario-actions button {
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  background: var(--brand);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.export-button {
+  padding: 12px 18px;
+}
+
+.export-button:hover,
+.save-button:hover,
+.scenario-actions button:hover {
+  background: var(--brand-dark);
+}
+
+.export-feedback {
+  position: absolute;
+  right: 18px;
+  bottom: -25px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(53, 42, 26, 0.09);
+}
+
 .dashboard {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -175,6 +235,71 @@ h1 {
 .section {
   margin-top: 22px;
   padding: 32px;
+}
+
+.scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.scenario-grid article {
+  min-height: 184px;
+  padding: 22px;
+  border: 1px dashed #cfc6b9;
+  border-radius: 15px;
+  background: #faf8f4;
+}
+
+.scenario-grid article.has-data {
+  border-style: solid;
+  border-color: rgba(154, 51, 44, 0.35);
+  background: #fff9f7;
+}
+
+.scenario-name {
+  margin-bottom: 14px;
+  color: var(--brand);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.scenario-grid article > strong {
+  display: block;
+  font-size: 22px;
+}
+
+.scenario-grid article > p {
+  min-height: 38px;
+  margin: 8px 0 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.save-button {
+  width: 100%;
+  padding: 11px 13px;
+}
+
+.scenario-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.scenario-actions button {
+  flex: 1;
+  padding: 9px;
+}
+
+.scenario-actions .text-button {
+  color: var(--muted);
+  background: transparent;
+}
+
+.scenario-actions .text-button:hover {
+  color: var(--brand);
+  background: #f2e9e5;
 }
 
 .section-title {
@@ -417,6 +542,64 @@ input[type="range"] {
   font-weight: 650;
 }
 
+.formula-section {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(249, 242, 234, 0.94));
+}
+
+.main-formula {
+  padding: 24px;
+  border-radius: 16px;
+  color: #fff;
+  background: #25221e;
+}
+
+.main-formula span {
+  display: block;
+  margin-bottom: 10px;
+  color: #d8b990;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.main-formula strong {
+  display: block;
+  font-size: clamp(20px, 3vw, 30px);
+  line-height: 1.55;
+}
+
+.formula-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.formula-grid article {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.formula-grid span {
+  color: var(--brand);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.formula-grid strong {
+  display: block;
+  margin: 8px 0 12px;
+  line-height: 1.55;
+}
+
+.formula-grid p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 footer {
   padding: 34px 4px 8px;
   color: var(--muted);
@@ -437,7 +620,8 @@ footer {
 
   .three-column,
   .cost-grid,
-  .cost-grid.fixed {
+  .cost-grid.fixed,
+  .scenario-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -458,6 +642,22 @@ footer {
 
   .hero-copy {
     font-size: 16px;
+  }
+
+  .toolbar {
+    position: static;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .export-button {
+    width: 100%;
+  }
+
+  .export-feedback {
+    position: static;
+    text-align: center;
   }
 
   .dashboard {
@@ -512,7 +712,9 @@ footer {
   .three-column,
   .cost-grid,
   .cost-grid.fixed,
-  .portion-grid {
+  .portion-grid,
+  .scenario-grid,
+  .formula-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,6 +1,34 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+type CalculatorData = {
+  salePrice: number;
+  platformRate: number;
+  beefPrice: number;
+  yieldRate: number;
+  cookedWeight: number;
+  operationLoss: number;
+  riceCost: number;
+  sideCost: number;
+  seasoningCost: number;
+  packageCost: number;
+  otherUnitCost: number;
+  dailyOrders: number;
+  openDays: number;
+  rent: number;
+  labor: number;
+  utilities: number;
+  otherFixed: number;
+};
+
+type SlotKey = "A" | "B" | "C";
+type SavedScenario = {
+  savedAt: string;
+  data: CalculatorData;
+};
+
+const STORAGE_KEY = "beef-brisket-calculator-scenarios-v1";
 
 type NumberFieldProps = {
   label: string;
@@ -112,6 +140,62 @@ export default function Home() {
   const [labor, setLabor] = useState(12000);
   const [utilities, setUtilities] = useState(2500);
   const [otherFixed, setOtherFixed] = useState(1000);
+  const [savedScenarios, setSavedScenarios] = useState<
+    Partial<Record<SlotKey, SavedScenario>>
+  >({});
+  const [exportFeedback, setExportFeedback] = useState("");
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        setSavedScenarios(JSON.parse(saved));
+      }
+    } catch {
+      // 浏览器禁用本地存储时，计算功能仍可正常使用。
+    }
+  }, []);
+
+  const currentData = useMemo<CalculatorData>(
+    () => ({
+      salePrice,
+      platformRate,
+      beefPrice,
+      yieldRate,
+      cookedWeight,
+      operationLoss,
+      riceCost,
+      sideCost,
+      seasoningCost,
+      packageCost,
+      otherUnitCost,
+      dailyOrders,
+      openDays,
+      rent,
+      labor,
+      utilities,
+      otherFixed,
+    }),
+    [
+      salePrice,
+      platformRate,
+      beefPrice,
+      yieldRate,
+      cookedWeight,
+      operationLoss,
+      riceCost,
+      sideCost,
+      seasoningCost,
+      packageCost,
+      otherUnitCost,
+      dailyOrders,
+      openDays,
+      rent,
+      labor,
+      utilities,
+      otherFixed,
+    ],
+  );
 
   const calc = useMemo(() => {
     const safeYield = Math.max(yieldRate, 1) / 100;
@@ -198,6 +282,110 @@ export default function Home() {
     };
   });
 
+  const applyData = (data: CalculatorData) => {
+    setSalePrice(data.salePrice);
+    setPlatformRate(data.platformRate);
+    setBeefPrice(data.beefPrice);
+    setYieldRate(data.yieldRate);
+    setCookedWeight(data.cookedWeight);
+    setOperationLoss(data.operationLoss);
+    setRiceCost(data.riceCost);
+    setSideCost(data.sideCost);
+    setSeasoningCost(data.seasoningCost);
+    setPackageCost(data.packageCost);
+    setOtherUnitCost(data.otherUnitCost);
+    setDailyOrders(data.dailyOrders);
+    setOpenDays(data.openDays);
+    setRent(data.rent);
+    setLabor(data.labor);
+    setUtilities(data.utilities);
+    setOtherFixed(data.otherFixed);
+  };
+
+  const persistScenarios = (
+    next: Partial<Record<SlotKey, SavedScenario>>,
+  ) => {
+    setSavedScenarios(next);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // 浏览器禁用本地存储时不阻断当前计算。
+    }
+  };
+
+  const saveScenario = (slot: SlotKey) => {
+    if (
+      savedScenarios[slot] &&
+      !window.confirm(`存档 ${slot} 已有数据，确定覆盖吗？`)
+    ) {
+      return;
+    }
+    persistScenarios({
+      ...savedScenarios,
+      [slot]: { savedAt: new Date().toISOString(), data: currentData },
+    });
+  };
+
+  const deleteScenario = (slot: SlotKey) => {
+    if (!savedScenarios[slot]) return;
+    const next = { ...savedScenarios };
+    delete next[slot];
+    persistScenarios(next);
+  };
+
+  const reportText = `牛腩饭盈利测算
+生成时间：${new Date().toLocaleString("zh-CN")}
+
+【核心参数】
+顾客实付：${money(salePrice)}
+美团综合扣除：${platformRate}%
+商家每单到账：${money(calc.settlement)}
+生牛腩采购价：${beefPrice}元/斤
+熟制出成率：${yieldRate}%
+熟牛腩净重：${cookedWeight}克
+操作损耗：${operationLoss}%
+牛腩成本：${money(calc.beefCost)}
+每份总变动成本：${money(calc.unitCost)}
+每单贡献利润：${money(calc.contribution)}
+
+【门店参数】
+每日订单：${dailyOrders}单
+每月营业：${openDays}天
+每月固定成本：${money(calc.fixed)}
+每日保本单量：${Number.isFinite(calc.breakEvenDaily) ? `${integer(calc.breakEvenDaily)}单` : "无法保本"}
+预计月利润：${money(calc.monthlyProfit)}
+预计月净利率：${calc.monthlyMargin.toFixed(1)}%
+
+【完整公式】
+月利润 = [售价 × (1−平台扣除率) − 牛腩成本 − 其他单份成本] × 日单量 × 营业天数 − 月固定成本
+牛腩成本 = (采购价 ÷ 500) × (熟牛腩克重 ÷ 出成率) × (1＋操作损耗率)
+
+说明：熟牛腩均指沥掉明显汤汁后的熟肉净重。`;
+
+  const exportReport = async () => {
+    setExportFeedback("");
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "牛腩饭盈利测算",
+          text: reportText,
+        });
+        setExportFeedback("已打开分享");
+      } else {
+        await navigator.clipboard.writeText(reportText);
+        setExportFeedback("报告已复制，可直接粘贴给朋友或AI");
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      try {
+        await navigator.clipboard.writeText(reportText);
+        setExportFeedback("报告已复制，可直接粘贴给朋友或AI");
+      } catch {
+        setExportFeedback("导出失败，请稍后重试");
+      }
+    }
+  };
+
   return (
     <main>
       <header className="hero">
@@ -207,6 +395,21 @@ export default function Home() {
           统一按<strong>熟牛腩净重</strong>计算，先看一份饭真正剩下多少钱。
         </p>
       </header>
+
+      <section className="toolbar" aria-label="数据操作">
+        <div>
+          <strong>数据操作</strong>
+          <span>分享当前结果，或保存三组方案反复比较</span>
+        </div>
+        <button className="export-button" onClick={exportReport}>
+          一键导出当前数据
+        </button>
+        {exportFeedback && (
+          <span className="export-feedback" role="status">
+            {exportFeedback}
+          </span>
+        )}
+      </section>
 
       <section className="dashboard" aria-label="核心结果">
         <article className="primary-card">
@@ -245,6 +448,64 @@ export default function Home() {
           </strong>
           <p>已把两位合伙人的工资计入人工</p>
         </article>
+      </section>
+
+      <section className="section scenario-section">
+        <div className="section-title">
+          <div>
+            <p className="eyebrow">方案存档</p>
+            <h2>A / B / C 三组参数</h2>
+          </div>
+          <span>只保存在当前浏览器</span>
+        </div>
+        <div className="scenario-grid">
+          {(["A", "B", "C"] as SlotKey[]).map((slot) => {
+            const saved = savedScenarios[slot];
+            return (
+              <article key={slot} className={saved ? "has-data" : ""}>
+                <div className="scenario-name">方案 {slot}</div>
+                {saved ? (
+                  <>
+                    <strong>
+                      {saved.data.salePrice}元 · 熟肉
+                      {saved.data.cookedWeight}克
+                    </strong>
+                    <p>
+                      保存于
+                      {new Date(saved.savedAt).toLocaleString("zh-CN", {
+                        month: "numeric",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                    <div className="scenario-actions">
+                      <button onClick={() => applyData(saved.data)}>载入</button>
+                      <button onClick={() => saveScenario(slot)}>覆盖</button>
+                      <button
+                        className="text-button"
+                        onClick={() => deleteScenario(slot)}
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <strong>尚未保存</strong>
+                    <p>保存当前页面的全部参数。</p>
+                    <button
+                      className="save-button"
+                      onClick={() => saveScenario(slot)}
+                    >
+                      保存当前方案
+                    </button>
+                  </>
+                )}
+              </article>
+            );
+          })}
+        </div>
       </section>
 
       <section className="section">
@@ -497,6 +758,63 @@ export default function Home() {
         </div>
         <p className="notice strong-notice">
           这是经营推演，不是开店结论。牛腩出成率、实际到账和员工平均打肉重量，必须通过实测替换默认值。
+        </p>
+      </section>
+
+      <section className="section formula-section">
+        <div className="section-title">
+          <div>
+            <p className="eyebrow">计算口径</p>
+            <h2>总体计算公式</h2>
+          </div>
+          <span>所有结果都由这组公式得出</span>
+        </div>
+        <div className="main-formula">
+          <span>月利润</span>
+          <strong>
+            ＝〔售价 ×（1－平台扣除率）－ 牛腩成本 －
+            其他单份成本〕× 日单量 × 营业天数 － 月固定成本
+          </strong>
+        </div>
+        <div className="formula-grid">
+          <article>
+            <span>每单实际到手</span>
+            <strong>售价 ×（1－平台扣除率）</strong>
+            <p>
+              {money(salePrice)} ×（1－{platformRate}%）＝
+              {money(calc.settlement)}
+            </p>
+          </article>
+          <article>
+            <span>熟牛腩成本</span>
+            <strong>
+              （采购价 ÷ 500）×（熟肉克重 ÷ 出成率）×（1＋损耗率）
+            </strong>
+            <p>
+              当前计算结果：{money(calc.beefCost)}
+            </p>
+          </article>
+          <article>
+            <span>每单贡献利润</span>
+            <strong>每单实际到手－每份总变动成本</strong>
+            <p>
+              {money(calc.settlement)}－{money(calc.unitCost)}＝
+              {money(calc.contribution)}
+            </p>
+          </article>
+          <article>
+            <span>每日保本单量</span>
+            <strong>月固定成本 ÷ 每单贡献利润 ÷ 营业天数</strong>
+            <p>
+              当前需要：
+              {Number.isFinite(calc.breakEvenDaily)
+                ? `${integer(calc.breakEvenDaily)}单/天`
+                : "无法保本"}
+            </p>
+          </article>
+        </div>
+        <p className="notice">
+          “其他单份成本”包括米饭、配菜、酱汁调味、餐盒包装和其他单份支出；“月固定成本”包括房租、全部人工、水电燃气和其他固定支出。
         </p>
       </section>
 
